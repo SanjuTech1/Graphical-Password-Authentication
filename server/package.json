@@ -26,7 +26,7 @@
     "nodemon": "^2.0.20",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^4.6.0",
-    "unsplash-js": "^7.0.15",
+    "unsplash-js": "^7.0.19",
     "uuid": "^9.0.0"
   }
 }

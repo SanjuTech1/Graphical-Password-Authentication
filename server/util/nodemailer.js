@@ -1,21 +1,38 @@
-//import * as dotenv from 'dotenv'
-import { createTransport } from "nodemailer"
+import * as dotenv from "dotenv";
+import { createTransport } from "nodemailer";
 
-//dotenv.config()
+// Load environment variables from .env file
+dotenv.config();
 
+// Create a transporter object using Gmail service
 const transporter = createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.SMPT_USER,
-        pass: process.env.SMTP_PASSWORD
+  service: "gmail",
+  auth: {
+    user: process.env.SMTP_USER, // Corrected variable name
+    pass: process.env.SMTP_PASSWORD,
+  },
+});
+
+// Mail options including sender, recipient, subject, and text
+const mailOptions = {
+  from: process.env.SMTP_USER, // Using the variable for consistency
+  to: "sanjusajeev055@gmail.com",
+  subject: "Test Email",
+  text: "test",
+};
+
+// Function to send email
+const sendEmail = () => {
+  transporter.sendMail(mailOptions, function (err, info) {
+    if (err) {
+      console.error("Error sending email:", err);
+    } else {
+      console.log("Email sent:", info.response);
     }
-})
+  });
+};
 
-// const mailOptions = {
-//     from: "graphicalpassauth@gmail.com",
-//     to: "autipratham1671@gmail.com",
-//     subject: "Test Email",
-//     text: "test"
-// }
+// Call the function to send the email
+sendEmail();
 
-export { transporter }
+export { transporter }; // Export the transporter if needed elsewhere
