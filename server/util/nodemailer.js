@@ -8,17 +8,17 @@ dotenv.config();
 const transporter = createTransport({
   service: "gmail",
   auth: {
-    user: process.env.SMTP_USER, // Corrected variable name
-    pass: process.env.SMTP_PASSWORD,
+    user: process.env.SMTP_USER, // Your Gmail address
+    pass: process.env.SMTP_PASSWORD, // Your Gmail password or App Password
   },
 });
 
 // Mail options including sender, recipient, subject, and text
 const mailOptions = {
   from: process.env.SMTP_USER, // Using the variable for consistency
-  to: "sanjusajeev055@gmail.com",
+  to: "sanjusajeev055@gmail.com", // Recipient email address
   subject: "Test Email",
-  text: "test",
+  text: "This is a test email sent using Nodemailer.",
 };
 
 // Function to send email

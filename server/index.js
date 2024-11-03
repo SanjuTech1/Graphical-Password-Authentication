@@ -13,7 +13,7 @@ import { router as imageRoutes } from "./routes/image.js";
 import { router as userRoutes } from "./routes/users.js";
 import { userAttemptsModel } from "./models/user_attempts.js";
 import { transporter } from "./util/nodemailer.js";
-import { createApi } from "unsplash-js"; // Add this line
+import { createApi } from "unsplash-js";
 
 // Log environment variables to ensure they are loaded
 console.log(process.env);
@@ -66,17 +66,28 @@ if (currentAttempts) {
 // Example of finding a user by username
 await userAttemptsModel.findOne({ username: "test" });
 
-// Create and save new user attempts
-const testAttempts = new userAttemptsModel({
+// Create and save new user attempts, with a check for duplicates
+const testAttempts = {
   username: "test2",
   email: "test2@gmail.com",
   attempts: 0,
-});
+};
 
-testAttempts
-  .save()
-  .then((res) => console.log("New user attempts saved:", res))
-  .catch((err) => console.log(err));
+try {
+  const existingUser = await userAttemptsModel.findOne({
+    $or: [{ username: testAttempts.username }, { email: testAttempts.email }],
+  });
+
+  if (existingUser) {
+    console.log("Username or email already exists.");
+  } else {
+    const newUser = new userAttemptsModel(testAttempts);
+    const savedUser = await newUser.save();
+    console.log("New user attempts saved:", savedUser);
+  }
+} catch (err) {
+  console.log("Error saving user attempts:", err);
+}
 
 // Send email (make sure mailOptions is defined)
 const mailOptions = {

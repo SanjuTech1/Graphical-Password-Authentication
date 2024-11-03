@@ -1,78 +1,101 @@
-//import * as dotenv from 'dotenv'
-import { usertModel as User } from '../models/user.js'
-import bcrypt from "bcryptjs"
-import { login_messages as  msg, commons} from '../static/message.js'
-import jwt from 'jsonwebtoken'
-import { checkArray, sendEmail } from '../util/util.js'
-import { userAttemptsModel } from '../models/user_attempts.js'
-import { nanoid } from 'nanoid'
-
+// loginController.js
+import { usertModel as User } from "../models/user.js";
+import bcrypt from "bcryptjs";
+import { login_messages as msg, commons } from "../static/message.js";
+import jwt from "jsonwebtoken";
+import { checkArray, sendEmail } from "../util/util.js";
+import { userAttemptsModel } from "../models/user_attempts.js";
+import { nanoid } from "nanoid";
 
 const login = async (req, res, next) => {
+  let token;
+  let existingUser;
+  let isValidPassword = false;
+  var isValidPattern = false;
+  var { username, password, pattern } = req.body;
+  username = username.toLowerCase();
 
-    //dotenv.config()
+  if (
+    typeof username === "undefined" ||
+    typeof password === "undefined" ||
+    typeof pattern === "undefined"
+  ) {
+    return res.status(406).json({
+      message: commons.invalid_params,
+      format: msg.format,
+    });
+  }
 
-    let token
-    let existingUser
-    let isValidPassword = false
-    var isValidPattern = false
-    var { username, password, pattern } = req.body
-    username = username.toLowerCase()
+  try {
+    existingUser = await User.findOne({ username });
+  } catch (err) {
+    return res.status(401).json({ message: msg.db_user_failed });
+  }
 
-    if (typeof username === 'undefined' || typeof password === 'undefined' || typeof pattern === 'undefined') {
-        res.status(406).json({
-            message: commons.invalid_params,
-            format: msg.format
-        })
-        return next()
+  if (!existingUser) {
+    return res.status(401).json({ message: msg.user_not_exist });
+  }
+
+  const currentAttempts = await userAttemptsModel.findOne({ username });
+
+  // Check if the user is blocked
+  if (currentAttempts.attempts > process.env.MAX_ATTEMPTS) {
+    return res
+      .status(403)
+      .json({
+        status: "blocked",
+        message: "Your account has been blocked, please check your email.",
+      });
+  }
+
+  try {
+    isValidPassword = await bcrypt.compare(password, existingUser.password);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: msg.db_pass_failed });
+  }
+
+  isValidPattern = checkArray(existingUser.pattern, pattern, true);
+
+  // Handle failed login attempts
+  if (!isValidPassword || !isValidPattern) {
+    await userAttemptsModel.findOneAndUpdate(
+      { username },
+      { attempts: currentAttempts.attempts + 1 }
+    );
+
+    if (currentAttempts.attempts + 1 === Number(process.env.MAX_ATTEMPTS)) {
+      await userAttemptsModel.findOneAndUpdate(
+        { username },
+        { token: nanoid(32) }
+      ); // Add token if needed
+      sendEmail(currentAttempts.email); // Notify user
     }
-    
-    try { existingUser = await User.findOne({username: username}) }
-    catch(err) {
-        res.status(401).json({message: msg.db_user_failed})
-        return next()
-    }
 
-    if (!existingUser) {
-        res.status(401).json({message: msg.user_not_exist})
-        return next()
-    }
+    return res.status(401).json({ message: msg.invalid_credentials });
+  }
 
-    const currentAttempts = await userAttemptsModel.findOne({username: username})
+  try {
+    token = jwt.sign(
+      { userId: existingUser.id, email: existingUser.email },
+      process.env.TOKEN_KEY
+    );
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: commons.token_failed });
+  }
 
-    if (currentAttempts.attempts > process.env.MAX_ATTEMPTS) {
-        res.status(500).json({status: "blocked", message: "Your account has been blocked, please check email."})
-        return next()
-    }
+  // Reset attempts on successful login
+  await userAttemptsModel.findOneAndUpdate({ username }, { attempts: 0 });
 
-    try { isValidPassword = await bcrypt.compare(password, existingUser.password) }
-    catch(err) {
-        console.log(err)
-        res.status(500).json({message: msg.db_pass_failed})
-        return next()
-    }
+  return res
+    .status(200)
+    .json({
+      username: existingUser.username,
+      userId: existingUser.id,
+      email: existingUser.email,
+      token,
+    });
+};
 
-    isValidPattern = checkArray(existingUser.pattern, pattern, true)
-
-    if (!isValidPassword || !isValidPattern) {
-        if (currentAttempts.attempts === Number(process.env.MAX_ATTEMPTS)) {
-            await userAttemptsModel.findOneAndUpdate({username: username}, {attempts: currentAttempts.attempts+1, token: nanoid(32)}).catch(err => console.log(err))
-            //console.log("sending email entered")
-            sendEmail(currentAttempts.email)
-        }
-        await userAttemptsModel.findOneAndUpdate({username: username}, {attempts: currentAttempts.attempts+1}).catch(err => console.log(err))
-        res.status(500).json({message: msg.invalid_credentials})
-        return next()
-    }
-
-    try { token = jwt.sign({userId: existingUser.id, email: existingUser.email}, process.env.TOKEN_KEY) }
-    catch (err) {
-        console.log(err)
-        res.status(500).json({message: commons.token_failed})
-        return next()
-    }
-    await userAttemptsModel.findOneAndUpdate({username: username}, {attempts: 0}).catch(err => console.log(err))
-    res.status(200).json({username: existingUser.username, userId: existingUser.id, email: existingUser.email, token: token})
-}
-
-export {login as loginController}
+export { login as loginController };

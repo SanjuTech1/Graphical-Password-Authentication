@@ -1,33 +1,34 @@
-import { commons, login_messages as msg } from "../static/message.js"
-import { usertModel as User } from "../models/user.js"
+import { commons, login_messages as msg } from "../static/message.js";
+import { usertModel as User } from "../models/user.js";
 
 const getByUser = async (req, res, next) => {
-    
-    var { username } = req.query
-    username = username.toLowerCase()
-    let existingUser
-    
-    if (typeof username === 'undefined') {
-        res.status(500).json({
-            message: commons.invalid_params,
-            format: "username"
-        })
-        return next()
-    }
+  let { username } = req.query;
 
-    try { existingUser = await User.findOne({username: username}) }
-    catch(err) {
-        console.log(err)
-        res.status(401).json({message: "Error occured while fetching from DB"})
-        return next()
-    }
+  if (!username) {
+    return res.status(400).json({
+      // Use 400 for bad requests
+      message: commons.invalid_params,
+      format: "username",
+    });
+  }
 
-    if (!existingUser) {
-        res.status(401).json({message: msg.user_not_exist})
-        return next()
-    }
+  username = username.toLowerCase(); // Normalize username to lowercase
+  let existingUser;
 
-    res.send(existingUser.sets)
-}
+  try {
+    existingUser = await User.findOne({ username });
+  } catch (err) {
+    console.error("Database error:", err); // More descriptive error logging
+    return res
+      .status(500)
+      .json({ message: "Error occurred while fetching from DB." });
+  }
 
-export { getByUser }
+  if (!existingUser) {
+    return res.status(404).json({ message: msg.user_not_exist }); // Use 404 for not found
+  }
+
+  return res.status(200).json(existingUser.sets); // Send the sets as JSON
+};
+
+export { getByUser };
